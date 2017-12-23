@@ -35,7 +35,10 @@ import { editorBackground, contrastBorder, activeContrastBorder } from 'vs/platf
 import { Themable, EDITOR_GROUP_HEADER_TABS_BACKGROUND, EDITOR_GROUP_HEADER_NO_TABS_BACKGROUND, EDITOR_GROUP_BORDER, EDITOR_DRAG_AND_DROP_BACKGROUND, EDITOR_GROUP_BACKGROUND, EDITOR_GROUP_HEADER_TABS_BORDER } from 'vs/workbench/common/theme';
 import { attachProgressBarStyler } from 'vs/platform/theme/common/styler';
 import { IDisposable, combinedDisposable } from 'vs/base/common/lifecycle';
+import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { EditorAreaDropHandler } from 'vs/workbench/browser/parts/editor/editorAreaDropHandler';
+import { BaseTextEditor } from 'vs/workbench/browser/parts/editor/textEditor';
+import { IPartService } from 'vs/workbench/services/part/common/partService';
 
 export enum Rochade {
 	NONE,
@@ -84,6 +87,23 @@ export interface IEditorGroupsControl {
 	getRatio(): number[];
 
 	dispose(): void;
+}
+
+function toSize(sizeStr: string, maxSize: number, defaultSize: number): number {
+	const regex = /^(\d+)(px|%)$/;
+	const match = regex.exec(sizeStr);
+	if (!match) {
+		return defaultSize;
+	}
+
+	const size = Math.max(0, +match[1]);
+	const postfix = match[2] as 'px' | '%';
+	switch (postfix) {
+		case '%':
+			return Math.ceil(Math.min(100, size) / 100 * maxSize);
+		case 'px':
+			return Math.floor(Math.min(maxSize, size));
+	}
 }
 
 /**
@@ -141,6 +161,8 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 		groupOrientation: GroupOrientation,
 		@IWorkbenchEditorService private editorService: IWorkbenchEditorService,
 		@IEditorGroupService private editorGroupService: IEditorGroupService,
+		@IConfigurationService private configurationService: IConfigurationService,
+		@IPartService private partService: IPartService,
 		@IContextKeyService private contextKeyService: IContextKeyService,
 		@IExtensionService private extensionService: IExtensionService,
 		@IInstantiationService private instantiationService: IInstantiationService,
@@ -187,6 +209,10 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 
 	private get minSize(): number {
 		return this.layoutVertically ? EditorGroupsControl.MIN_EDITOR_WIDTH : EditorGroupsControl.MIN_EDITOR_HEIGHT;
+	}
+
+	private get visibleSilos(): number {
+		return this.visibleEditors.reduce((acc, min) => min ? acc + 1 : acc, 0);
 	}
 
 	private isSiloMinimized(position: number): boolean {
@@ -2017,9 +2043,27 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 
 	private layoutEditor(position: Position): void {
 		const editorSize = this.silosSize[position];
-		if (editorSize && this.visibleEditors[position]) {
+		const editor = this.visibleEditors[position];
+		if (editorSize && editor) {
 			let editorWidth = this.layoutVertically ? editorSize : this.dimension.width;
 			let editorHeight = (this.layoutVertically ? this.dimension.height : this.silosSize[position]) - EditorGroupsControl.EDITOR_TITLE_HEIGHT;
+
+			let editorPosition = '0px';
+
+			// When in zen mode, if there is only one silo open and it shows an editor,
+			// center the editor
+			const centerEditor = this.partService.isInZenMode() &&
+				editor instanceof BaseTextEditor &&
+				this.configurationService.getValue<boolean>('zenMode.centerEditor') &&
+				this.visibleSilos === 1;
+
+			if (centerEditor) {
+				const availableWidth = this.dimension.width;
+				const [leftSize, rightSize] = this.getCenteredEditorSize(availableWidth);
+				editorWidth = leftSize + rightSize;
+				editorPosition = Math.floor(availableWidth / 2 - leftSize) + 'px';
+			}
+
 
 			if (position !== Position.ONE) {
 				if (this.layoutVertically) {
@@ -2029,7 +2073,26 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 				}
 			}
 
-			this.visibleEditors[position].layout(new Dimension(editorWidth, editorHeight));
+			editor.getContainer().style({'margin-left': editorPosition});
+			editor.layout(new Dimension(editorWidth, editorHeight));
+		}
+	}
+
+	// returns the configured size of the left and the right part of the editor (seen from the center)
+	private getCenteredEditorSize(maxSize: number): [number, number] {
+		interface ICenterEditorSizeConfig {
+			left: string;
+			right: string;
+		}
+
+		const sizeConfig = this.configurationService.getValue<string | ICenterEditorSizeConfig>('zenMode.centerEditorSize');
+		if (typeof sizeConfig === 'object') {
+			const leftSize = toSize(sizeConfig.left, maxSize/2, Math.ceil(maxSize * 0.3));
+			const rightSize = toSize(sizeConfig.right, maxSize/2, maxSize);
+			return [leftSize, rightSize];
+		} else {
+			const size = toSize(sizeConfig, maxSize, Math.ceil(maxSize * 0.5));
+			return [Math.floor(size/2), Math.ceil(size/2)];
 		}
 	}
 

@@ -419,6 +419,28 @@ configurationRegistry.registerConfiguration({
 			'type': 'boolean',
 			'default': false,
 			'description': nls.localize('zenMode.restore', "Controls if a window should restore to zen mode if it was exited in zen mode.")
+		},
+		'zenMode.centerEditor': {
+			'type': 'boolean',
+			'default': false,
+			'description': nls.localize('zenMode.centerEditor', "Controls if a single editor is centered when in zen mode.")
+		},
+		'zenMode.centerEditorSize': {
+			'type': ['string', 'object'],
+			'default': '50%',
+			'description': nls.localize('zenMode.centerEditorSize', "Controls the size of the centered editor. Either a size string (e.g. \"60%\" or \"300px\") or an object describing the width."),
+			'properties': {
+				'left': {
+					'type': 'string',
+					'default': '30%',
+					'description': nls.localize('zenMode.centerEditorSize.left', "Controls the size of the centered editor on the left side of the center.")
+				},
+				'right': {
+					'type': 'string',
+					'default': '100%',
+					'description': nls.localize('zenMode.centerEditorSize.right', "Controls the size of the centered editor on the right side of the center.")
+				}
+			}
 		}
 	}
 });

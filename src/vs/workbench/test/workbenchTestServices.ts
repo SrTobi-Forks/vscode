@@ -422,6 +422,7 @@ export class TestPartService implements IPartService {
 	public removeClass(clazz: string): void { }
 	public getWorkbenchElementId(): string { return ''; }
 
+	public isInZenMode(): boolean { return false; }
 	public toggleZenMode(): void { }
 
 	public resizePart(part: Parts, sizeChange: number): void { }
