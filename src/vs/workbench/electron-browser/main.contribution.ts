@@ -432,3 +432,34 @@ configurationRegistry.registerConfiguration({
 		}
 	}
 });
+
+// Configuration: Center Mode
+configurationRegistry.registerConfiguration({
+	'id': 'centerMode',
+	'order': 10,
+	'title': nls.localize('centerModeConfigurationTitle', "Center Mode"),
+	'type': 'object',
+	'properties': {
+		'centerMode.autoActivate': {
+			'type': 'string',
+			'enum': ['always', 'zen', 'fullscreen', 'never'],
+			'default': 'never',
+			'description': nls.localize('centerMode.autoActivate', "Controls when the center should be activated automatically.")
+		},
+		'centerMode.size': {
+			'type': ['number'],
+			'default': 1200,
+			'description': nls.localize('centerMode.size', "Controls the size of the centered widget.")
+		},
+		'centerMode.adoptRight': {
+			'type': 'boolean',
+			'default': true,
+			'description': nls.localize('centerMode.adoptRight', "Controls whether the centered widget should occupy the otherwise empty space on it's right side.")
+		},
+		'centerMode.onlyEditors': {
+			'type': 'boolean',
+			'default': true,
+			'description': nls.localize('centerMode.onlyEditor', "Controls whether only code editors should be centered or if other widgets, like the welcome page, should be centered as well.")
+		}
+	}
+});

@@ -1257,6 +1257,10 @@ export class Workbench implements IPartService {
 		return Identifiers.WORKBENCH_CONTAINER;
 	}
 
+	public isInZenMode(): boolean {
+		return this.zenMode.active;
+	}
+
 	public toggleZenMode(skipLayout?: boolean): void {
 		this.zenMode.active = !this.zenMode.active;
 

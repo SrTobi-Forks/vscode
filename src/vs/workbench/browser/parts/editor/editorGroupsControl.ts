@@ -11,6 +11,7 @@ import Event, { Emitter } from 'vs/base/common/event';
 import { StandardMouseEvent } from 'vs/base/browser/mouseEvent';
 import types = require('vs/base/common/types');
 import { Dimension, Builder, $ } from 'vs/base/browser/builder';
+import * as browser from 'vs/base/browser/browser';
 import { Sash, ISashEvent, IVerticalSashLayoutProvider, IHorizontalSashLayoutProvider, Orientation } from 'vs/base/browser/ui/sash/sash';
 import { ProgressBar } from 'vs/base/browser/ui/progressbar/progressbar';
 import { BaseEditor } from 'vs/workbench/browser/parts/editor/baseEditor';
@@ -36,7 +37,10 @@ import { Themable, EDITOR_GROUP_HEADER_TABS_BACKGROUND, EDITOR_GROUP_HEADER_NO_T
 import { attachProgressBarStyler } from 'vs/platform/theme/common/styler';
 import { IDisposable, combinedDisposable } from 'vs/base/common/lifecycle';
 import { ResourcesDropHandler, LocalSelectionTransfer, DraggedEditorIdentifier } from 'vs/workbench/browser/dnd';
+import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
+import { IPartService } from 'vs/workbench/services/part/common/partService';
+import { TextResourceEditor } from 'vs/workbench/browser/parts/editor/textResourceEditor';
 
 export enum Rochade {
 	NONE,
@@ -144,6 +148,8 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 		groupOrientation: GroupOrientation,
 		@IWorkbenchEditorService private editorService: IWorkbenchEditorService,
 		@IEditorGroupService private editorGroupService: IEditorGroupService,
+		@IConfigurationService private configurationService: IConfigurationService,
+		@IPartService private partService: IPartService,
 		@IContextKeyService private contextKeyService: IContextKeyService,
 		@IExtensionService private extensionService: IExtensionService,
 		@IInstantiationService private instantiationService: IInstantiationService,
@@ -191,6 +197,10 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 
 	private get minSize(): number {
 		return this.layoutVertically ? EditorGroupsControl.MIN_EDITOR_WIDTH : EditorGroupsControl.MIN_EDITOR_HEIGHT;
+	}
+
+	private get visibleSilos(): number {
+		return this.visibleEditors.reduce((acc, min) => min ? acc + 1 : acc, 0);
 	}
 
 	private isSiloMinimized(position: number): boolean {
@@ -2031,9 +2041,33 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 
 	private layoutEditor(position: Position): void {
 		const editorSize = this.silosSize[position];
-		if (editorSize && this.visibleEditors[position]) {
+		const editor = this.visibleEditors[position];
+		if (editorSize && editor) {
 			let editorWidth = this.layoutVertically ? editorSize : this.dimension.width;
 			let editorHeight = (this.layoutVertically ? this.dimension.height : this.silosSize[position]) - EditorGroupsControl.EDITOR_TITLE_HEIGHT;
+
+			let editorPosition = 0;
+
+			const autoActivate = this.configurationService.getValue<string>('centerMode.autoActivate');
+
+			let tryCentering =
+				autoActivate === 'fullscreen' && browser.isFullscreen() ||
+				autoActivate === 'zen' && this.partService.isInZenMode() ||
+				autoActivate === 'always';
+
+			if (tryCentering) {
+				const size = Math.max(100, this.configurationService.getValue<number>('centerMode.size'));
+				const adoptRight = this.configurationService.getValue<string>('centerMode.adoptRight');
+				const centerOnlyEditors = this.configurationService.getValue<string>('centerMode.onlyEditors');
+				const availableWidth = this.dimension.width;
+
+				const isTextEditor = editor instanceof TextResourceEditor;
+				if (this.visibleSilos === 1 && (!centerOnlyEditors || isTextEditor) && availableWidth > size) {
+					const margin = Math.floor((availableWidth - size) / 2);
+					editorWidth = availableWidth - 2 * margin + (adoptRight ? margin : 0);
+					editorPosition = margin;
+				}
+			}
 
 			if (position !== Position.ONE) {
 				if (this.layoutVertically) {
@@ -2043,7 +2077,8 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 				}
 			}
 
-			this.visibleEditors[position].layout(new Dimension(editorWidth, editorHeight));
+			editor.getContainer().style({ 'margin-left': editorPosition + 'px', 'width': editorWidth + 'px' });
+			editor.layout(new Dimension(editorWidth, editorHeight));
 		}
 	}
 

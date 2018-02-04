@@ -125,6 +125,11 @@ export interface IPartService {
 	getWorkbenchElementId(): string;
 
 	/**
+	 * Returns whether the zen mode is currently active.
+	 */
+	isInZenMode(): void;
+
+	/**
 	 * Toggles the workbench in and out of zen mode - parts get hidden and window goes fullscreen.
 	 */
 	toggleZenMode(): void;
