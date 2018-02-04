@@ -2051,6 +2051,7 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 			const autoActivate = this.configurationService.getValue<string>('centerMode.autoActivate');
 
 			let tryCentering =
+				this.partService.isCenterModeForced() ||
 				autoActivate === 'fullscreen' && browser.isFullscreen() ||
 				autoActivate === 'zen' && this.partService.isInZenMode() ||
 				autoActivate === 'always';

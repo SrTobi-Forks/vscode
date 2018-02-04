@@ -430,6 +430,10 @@ export class TestPartService implements IPartService {
 	public isInZenMode(): boolean { return false; }
 	public toggleZenMode(): void { }
 
+	public isCenterModeForced(): boolean { return false; }
+	public toggleForcedCenterMode(): void { }
+
+
 	public resizePart(part: Parts, sizeChange: number): void { }
 }
 

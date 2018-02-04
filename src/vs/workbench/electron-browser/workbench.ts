@@ -155,6 +155,7 @@ export class Workbench implements IPartService {
 	private static readonly sidebarRestoreStorageKey = 'workbench.sidebar.restore';
 	private static readonly panelHiddenStorageKey = 'workbench.panel.hidden';
 	private static readonly zenModeActiveStorageKey = 'workbench.zenmode.active';
+	private static readonly centerModeForcedStorageKey = 'workbench.forcedcentermode.active';
 	private static readonly panelPositionStorageKey = 'workbench.panel.location';
 	private static readonly defaultPanelPositionStorageKey = 'workbench.panel.defaultLocation';
 
@@ -213,6 +214,7 @@ export class Workbench implements IPartService {
 		wasSideBarVisible: boolean;
 		wasPanelVisible: boolean;
 	};
+	private centerModeForced: boolean;
 
 	constructor(
 		parent: HTMLElement,
@@ -377,6 +379,11 @@ export class Workbench implements IPartService {
 		// Restore Zen Mode if active
 		if (this.storageService.getBoolean(Workbench.zenModeActiveStorageKey, StorageScope.WORKSPACE, false)) {
 			this.toggleZenMode(true);
+		}
+
+		// Restore Forced Center Mode
+		if (this.storageService.getBoolean(Workbench.centerModeForcedStorageKey, StorageScope.WORKSPACE, false)) {
+			this.centerModeForced = true;
 		}
 
 		const onRestored = (error?: Error): IWorkbenchStartedInfo => {
@@ -660,6 +667,9 @@ export class Workbench implements IPartService {
 			wasSideBarVisible: false,
 			wasPanelVisible: false
 		};
+
+		// Force Center Mode
+		this.centerModeForced = false;
 	}
 
 	private setPanelPositionFromStorageOrConfig() {
@@ -1315,6 +1325,22 @@ export class Workbench implements IPartService {
 		if (toggleFullScreen) {
 			this.windowService.toggleFullScreen().done(void 0, errors.onUnexpectedError);
 		}
+	}
+
+	public isCenterModeForced(): boolean {
+		return this.centerModeForced;
+	}
+
+	public toggleForcedCenterMode(): void {
+		this.centerModeForced = !this.centerModeForced;
+
+		if (this.centerModeForced) {
+			this.storageService.store(Workbench.centerModeForcedStorageKey, 'true', StorageScope.WORKSPACE);
+		} else {
+			this.storageService.remove(Workbench.centerModeForcedStorageKey, StorageScope.WORKSPACE);
+		}
+
+		this.layout();
 	}
 
 	// Resize requested part along the main axis

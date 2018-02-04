@@ -135,6 +135,17 @@ export interface IPartService {
 	toggleZenMode(): void;
 
 	/**
+	 * Returns whether the center mode is forced.
+	 * Even if this returns false, the center mode might still be actived by other conditions.
+	 */
+	isCenterModeForced(): boolean;
+
+	/**
+	 * Toggles the workbench in and out of forced center mode.
+	 */
+	toggleForcedCenterMode(): void;
+
+	/**
 	 * Resizes currently focused part on main access
 	 */
 	resizePart(part: Parts, sizeChange: number): void;
