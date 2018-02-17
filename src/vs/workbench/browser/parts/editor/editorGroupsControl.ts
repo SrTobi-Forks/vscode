@@ -105,6 +105,8 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 
 	private static readonly EDITOR_TITLE_HEIGHT = 35;
 
+	private static readonly CENTERED_EDITOR_MIN_MARGIN = 10;
+
 	private static readonly SNAP_TO_MINIMIZED_THRESHOLD_WIDTH = 50;
 	private static readonly SNAP_TO_MINIMIZED_THRESHOLD_HEIGHT = 20;
 
@@ -128,6 +130,14 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 
 	private sashTwo: Sash;
 	private startSiloThreeSize: number;
+
+	private centeredEditorActive: boolean;
+	private centeredEditorSashLeft: Sash;
+	private centeredEditorSashRight: Sash;
+	private centeredEditorPreferedSize: number;
+	private centeredEditorLeftMarginRatio: number;
+	private centeredEditorDragStartPosition: number;
+	private centeredEditorDragStartSize: number;
 
 	private visibleEditors: BaseEditor[];
 
@@ -217,6 +227,22 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 				this.silosMinimized[p] = false; // release silo from minimized state if it was sized large enough
 			}
 		});
+	}
+
+	private get centeredEditorAvailableSize(): number {
+		return this.silosSize[0] - EditorGroupsControl.CENTERED_EDITOR_MIN_MARGIN * 2;
+	}
+
+	private get centeredEditorSize(): number {
+		return Math.min(this.centeredEditorAvailableSize, this.centeredEditorPreferedSize);
+	}
+
+	private get centeredEditorPosition(): number {
+		return EditorGroupsControl.CENTERED_EDITOR_MIN_MARGIN + this.centeredEditorLeftMarginRatio * (this.centeredEditorAvailableSize - this.centeredEditorSize);
+	}
+
+	private get centeredEditorEndPosition(): number {
+		return this.centeredEditorPosition + this.centeredEditorSize;
 	}
 
 	private get snapToMinimizeThresholdSize(): number {
@@ -978,6 +1004,21 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 
 		// Silo Three
 		this.silos[Position.THREE] = $(this.parent).div({ class: 'one-editor-silo editor-three' });
+
+		// Center Layout stuff
+		this.centeredEditorSashLeft = new Sash(this.parent.getHTMLElement(), this, { baseSize: 5, orientation: Orientation.VERTICAL });
+		this.toUnbind.push(this.centeredEditorSashLeft.onDidStart(() => this.onCenterSashLeftDragStart()));
+		this.toUnbind.push(this.centeredEditorSashLeft.onDidChange((e: ISashEvent) => this.onCenterSashLeftDrag(e)));
+		this.toUnbind.push(this.centeredEditorSashLeft.onDidEnd(() => this.onCenterSashLeftDragEnd()));
+
+		this.centeredEditorSashRight = new Sash(this.parent.getHTMLElement(), this, { baseSize: 5, orientation: Orientation.VERTICAL });
+		this.toUnbind.push(this.centeredEditorSashRight.onDidStart(() => this.onCenterSashRightDragStart()));
+		this.toUnbind.push(this.centeredEditorSashRight.onDidChange((e: ISashEvent) => this.onCenterSashRightDrag(e)));
+		this.toUnbind.push(this.centeredEditorSashRight.onDidEnd(() => this.onCenterSashRightDragEnd()));
+
+		this.centeredEditorActive = false;
+		this.centeredEditorLeftMarginRatio = 0.5;
+		this.centeredEditorPreferedSize = -1; // set this later if we know the container size
 
 		// For each position
 		POSITIONS.forEach(position => {
@@ -1868,12 +1909,70 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 		this.sashTwo.layout();
 	}
 
+	private setCenteredEditorPositionAndSize(pos: number, size: number): void {
+		this.centeredEditorPreferedSize = Math.max(this.minSize, size);
+		pos -= EditorGroupsControl.CENTERED_EDITOR_MIN_MARGIN;
+		pos = Math.min(pos, this.centeredEditorAvailableSize - this.centeredEditorSize);
+		pos = Math.max(0, pos);
+		this.centeredEditorLeftMarginRatio = pos / (this.centeredEditorAvailableSize - this.centeredEditorSize);
+
+		this.layoutContainers();
+	}
+
+	private onCenterSashLeftDragStart(): void {
+		this.centeredEditorDragStartPosition = this.centeredEditorPosition;
+		this.centeredEditorDragStartSize = this.centeredEditorSize;
+	}
+
+	private onCenterSashLeftDrag(e: ISashEvent): void {
+		const minMargin = EditorGroupsControl.CENTERED_EDITOR_MIN_MARGIN;
+		const diffPos = e.currentX - e.startX;
+		const diffSize = -diffPos;
+
+		const pos = this.centeredEditorDragStartPosition + diffPos;
+		const size = this.centeredEditorDragStartSize + diffSize;
+		this.setCenteredEditorPositionAndSize(pos, pos <= minMargin ? size + pos - minMargin : size);
+	}
+
+	private onCenterSashLeftDragEnd(): void {
+		this.layoutContainers();
+	}
+
+	private onCenterSashRightDragStart(): void {
+		this.centeredEditorDragStartPosition = this.centeredEditorPosition;
+		this.centeredEditorDragStartSize = this.centeredEditorSize;
+	}
+
+	private onCenterSashRightDrag(e: ISashEvent): void {
+		const diffPos = e.currentX - e.startX;
+		const diffSize = diffPos;
+
+		const pos = this.centeredEditorDragStartPosition;
+		const maxSize = this.centeredEditorAvailableSize - this.centeredEditorDragStartPosition;
+		const size = Math.min(maxSize, this.centeredEditorDragStartSize + diffSize);
+		this.setCenteredEditorPositionAndSize(size < this.minSize ? pos + (size - this.minSize) : pos, size);
+	}
+
+	private onCenterSashRightDragEnd(): void {
+	}
+
 	public getVerticalSashTop(sash: Sash): number {
 		return 0;
 	}
 
 	public getVerticalSashLeft(sash: Sash): number {
-		return sash === this.sashOne ? this.silosSize[Position.ONE] : this.silosSize[Position.TWO] + this.silosSize[Position.ONE];
+		switch (sash) {
+			case this.sashOne:
+				return this.silosSize[Position.ONE];
+			case this.sashTwo:
+				return this.silosSize[Position.TWO] + this.silosSize[Position.ONE];
+			case this.centeredEditorSashLeft:
+				return this.centeredEditorPosition;
+			case this.centeredEditorSashRight:
+				return this.centeredEditorEndPosition;
+			default:
+				return 0;
+		}
 	}
 
 	public getVerticalSashHeight(sash: Sash): number {
@@ -2023,6 +2122,32 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 			}
 		});
 
+		// Layout centered Editor
+		const doCentering =
+			this.layoutVertically &&
+			this.visibleSilos === 1 &&
+			this.partService.isCenterModeForced() &&
+			this.visibleEditors[Position.ONE] instanceof TextResourceEditor;
+
+		if (doCentering && !this.centeredEditorActive) {
+			this.centeredEditorSashLeft.show();
+			this.centeredEditorSashRight.show();
+
+			// no size set yet. Calculate a default value
+			if (this.centeredEditorPreferedSize === -1) {
+				this.centeredEditorPreferedSize = Math.floor(this.dimension.width * 0.5);
+			}
+		} else if (!doCentering && this.centeredEditorActive) {
+			this.centeredEditorSashLeft.hide();
+			this.centeredEditorSashRight.hide();
+		}
+		this.centeredEditorActive = doCentering;
+
+		if (this.centeredEditorActive) {
+			this.centeredEditorSashLeft.layout();
+			this.centeredEditorSashRight.layout();
+		}
+
 		// Layout visible editors
 		POSITIONS.forEach(position => {
 			this.layoutEditor(position);
@@ -2048,26 +2173,9 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 
 			let editorPosition = 0;
 
-			const autoActivate = this.configurationService.getValue<string>('centerMode.autoActivate');
-
-			let tryCentering =
-				this.partService.isCenterModeForced() ||
-				autoActivate === 'fullscreen' && browser.isFullscreen() ||
-				autoActivate === 'zen' && this.partService.isInZenMode() ||
-				autoActivate === 'always';
-
-			if (tryCentering) {
-				const size = Math.max(100, this.configurationService.getValue<number>('centerMode.size'));
-				const adoptRight = this.configurationService.getValue<string>('centerMode.adoptRight');
-				const centerOnlyEditors = this.configurationService.getValue<string>('centerMode.onlyEditors');
-				const availableWidth = this.dimension.width;
-
-				const isTextEditor = editor instanceof TextResourceEditor;
-				if (this.visibleSilos === 1 && (!centerOnlyEditors || isTextEditor) && availableWidth > size) {
-					const margin = Math.floor((availableWidth - size) / 2);
-					editorWidth = availableWidth - 2 * margin + (adoptRight ? margin : 0);
-					editorPosition = margin;
-				}
+			if (this.centeredEditorActive) {
+				editorWidth = this.centeredEditorSize;
+				editorPosition = this.centeredEditorPosition;
 			}
 
 			if (position !== Position.ONE) {
