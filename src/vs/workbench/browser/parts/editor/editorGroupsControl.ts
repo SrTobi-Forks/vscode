@@ -982,6 +982,22 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 		return this.lastActivePosition;
 	}
 
+	private createSash(
+		orientation: Orientation,
+		onDidStart: (e: ISashEvent) => any,
+		onDidChange: (e: ISashEvent) => any,
+		onDidEnd: () => any,
+		onDidReset: () => any
+	): Sash {
+		const sash = new Sash(this.parent.getHTMLElement(), this, { baseSize: 5, orientation });
+		this.toUnbind.push(sash.onDidStart(onDidStart.bind(this)));
+		this.toUnbind.push(sash.onDidChange(onDidChange.bind(this)));
+		this.toUnbind.push(sash.onDidEnd(onDidEnd.bind(this)));
+		this.toUnbind.push(sash.onDidReset(onDidReset.bind(this)));
+		sash.hide();
+		return sash;
+	}
+
 	private create(): void {
 
 		// Store layout as class property
@@ -994,39 +1010,21 @@ export class EditorGroupsControl extends Themable implements IEditorGroupsContro
 		this.silos[Position.ONE] = $(this.parent).div({ class: 'one-editor-silo editor-one' });
 
 		// Sash One
-		this.sashOne = new Sash(this.parent.getHTMLElement(), this, { baseSize: 5, orientation: this.layoutVertically ? Orientation.VERTICAL : Orientation.HORIZONTAL });
-		this.toUnbind.push(this.sashOne.onDidStart(() => this.onSashOneDragStart()));
-		this.toUnbind.push(this.sashOne.onDidChange((e: ISashEvent) => this.onSashOneDrag(e)));
-		this.toUnbind.push(this.sashOne.onDidEnd(() => this.onSashOneDragEnd()));
-		this.toUnbind.push(this.sashOne.onDidReset(() => this.onSashOneReset()));
-		this.sashOne.hide();
+		const currentOrientation = this.layoutVertically ? Orientation.VERTICAL : Orientation.HORIZONTAL;
+		this.sashOne = this.createSash(currentOrientation, this.onSashOneDragStart, this.onSashOneDrag, this.onSashOneDragEnd, this.onSashOneReset);
 
 		// Silo Two
 		this.silos[Position.TWO] = $(this.parent).div({ class: 'one-editor-silo editor-two' });
 
 		// Sash Two
-		this.sashTwo = new Sash(this.parent.getHTMLElement(), this, { baseSize: 5, orientation: this.layoutVertically ? Orientation.VERTICAL : Orientation.HORIZONTAL });
-		this.toUnbind.push(this.sashTwo.onDidStart(() => this.onSashTwoDragStart()));
-		this.toUnbind.push(this.sashTwo.onDidChange((e: ISashEvent) => this.onSashTwoDrag(e)));
-		this.toUnbind.push(this.sashTwo.onDidEnd(() => this.onSashTwoDragEnd()));
-		this.toUnbind.push(this.sashTwo.onDidReset(() => this.onSashTwoReset()));
-		this.sashTwo.hide();
+		this.sashTwo = this.createSash(currentOrientation, this.onSashTwoDragStart, this.onSashTwoDrag, this.onSashTwoDragEnd, this.onSashTwoReset);
 
 		// Silo Three
 		this.silos[Position.THREE] = $(this.parent).div({ class: 'one-editor-silo editor-three' });
 
 		// Center Layout stuff
-		this.centeredEditorSashLeft = new Sash(this.parent.getHTMLElement(), this, { baseSize: 5, orientation: Orientation.VERTICAL });
-		this.toUnbind.push(this.centeredEditorSashLeft.onDidStart(() => this.onCenterSashLeftDragStart()));
-		this.toUnbind.push(this.centeredEditorSashLeft.onDidChange((e: ISashEvent) => this.onCenterSashLeftDrag(e)));
-		this.toUnbind.push(this.centeredEditorSashLeft.onDidEnd(() => this.storeCenteredLayoutData()));
-		this.toUnbind.push(this.centeredEditorSashLeft.onDidReset(() => this.resetCenteredEditor()));
-
-		this.centeredEditorSashRight = new Sash(this.parent.getHTMLElement(), this, { baseSize: 5, orientation: Orientation.VERTICAL });
-		this.toUnbind.push(this.centeredEditorSashRight.onDidStart(() => this.onCenterSashRightDragStart()));
-		this.toUnbind.push(this.centeredEditorSashRight.onDidChange((e: ISashEvent) => this.onCenterSashRightDrag(e)));
-		this.toUnbind.push(this.centeredEditorSashRight.onDidEnd(() => this.storeCenteredLayoutData()));
-		this.toUnbind.push(this.centeredEditorSashRight.onDidReset(() => this.resetCenteredEditor()));
+		this.centeredEditorSashLeft = this.createSash(currentOrientation, this.onCenterSashLeftDragStart, this.onCenterSashLeftDrag, this.storeCenteredLayoutData, this.resetCenteredEditor);
+		this.centeredEditorSashRight = this.createSash(currentOrientation, this.onCenterSashRightDragStart, this.onCenterSashRightDrag, this.storeCenteredLayoutData, this.resetCenteredEditor);
 
 		this.centeredEditorActive = false;
 		this.centeredEditorLeftMarginRatio = 0.5;
